@@ -1,0 +1,8 @@
+name,text
+alert/header,"Attention. This is an automated alert."
+alert/severity/critical,"Critical alert."
+alert/severity/warning,"Warning alert."
+alert/event/bgp-session-down,"B G P session is down."
+alert/event/disk-space-low,"Disk space is low."
+alert/field/peer-as,"Peer autonomous system."
+alert/field/usage-percent,"Usage percentage."

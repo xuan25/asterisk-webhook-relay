@@ -1,0 +1,19 @@
+name: asterisk-webhook-relay
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      RELAY_AMI_HOST: ${RELAY_AMI_HOST:-asterisk}
+      RELAY_AMI_PORT: ${RELAY_AMI_PORT:-5038}
+      RELAY_AMI_USERNAME: ${RELAY_AMI_USERNAME:?set in .env or environment}
+      RELAY_AMI_PASSWORD: ${RELAY_AMI_PASSWORD:?set in .env or environment}
+      RELAY_WEBHOOK_HMAC_SECRET: ${RELAY_WEBHOOK_HMAC_SECRET:?set in .env or environment}
+      RELAY_LISTEN_HOST: ${RELAY_LISTEN_HOST:-::}
+      RELAY_LISTEN_PORT: ${RELAY_LISTEN_PORT:-8080}
+      RELAY_MAX_BODY_BYTES: ${RELAY_MAX_BODY_BYTES:-65536}
+      RELAY_WRITE_QUEUE_SIZE: ${RELAY_WRITE_QUEUE_SIZE:-100}

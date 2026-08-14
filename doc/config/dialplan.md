@@ -104,6 +104,34 @@ asterisk -rx 'pjsip show endpoint <recipient-endpoint>'
 asterisk -rx 'pjsip show contacts'
 ```
 
+## Advanced configuration: route AMI callouts by logical destination
+
+The basic configuration originates directly to a PJSIP endpoint. Use this
+advanced mode when a phone alert should reuse the PBX number-routing policy:
+for example, when the destination can be a local extension, an external number
+resolved through ENUM, or a future outbound trunk.
+
+### 1. Add a dedicated AMI ingress context
+
+Create one ingress context for AMI-originated callouts. Replace
+`<AMI_INGRESS_CONTEXT>` and `<CANONICAL_ROUTING_CONTEXT>` with local context
+names. The canonical routing context owns the numbering plan and selects the
+actual PJSIP endpoint or outbound peer.
+
+```ini
+[<AMI_INGRESS_CONTEXT>]
+exten => _!,1,Set(CALL_SOURCE=ami)
+ same => n,Set(CALL_DESTINATION=${EXTEN})
+ same => n,Goto(<CANONICAL_ROUTING_CONTEXT>,${EXTEN},1)
+```
+
+Add site-specific call logging or a hangup handler in this ingress context if
+needed. `CALL_SOURCE` and `CALL_DESTINATION` are example channel-variable
+names; map them to the local accounting convention if one exists. The final
+`Goto()` passes the logical destination to `<CANONICAL_ROUTING_CONTEXT>`.
+Restrict the extension pattern instead of `_!` when that context does not
+safely reject unsupported destinations.
+
 ## Examples
 
 ### Completed language and endpoint substitutions
@@ -128,6 +156,27 @@ same => n,Set(CHANNEL(language)=xuan25)
 ```sh
 asterisk -rx 'pjsip show endpoint 0001'
 ```
+
+### Completed AMI ingress context
+
+For an ingress context named `context-ami` and a canonical routing context
+named `context-local-routing`, the advanced configuration becomes:
+
+```ini
+[context-ami]
+exten => _!,1,Set(PBX_SOURCE=ami)
+ same => n,Set(PBX_FROM=${CALLERID(num)})
+ same => n,Set(PBX_TO=${EXTEN})
+ same => n,Set(PBX_RESULT=UNKNOWN)
+ same => n,Log(pbxevent,CALL_IN source=${PBX_SOURCE} from=${PBX_FROM} to=${PBX_TO} uniqueid=${UNIQUEID} linkedid=${CHANNEL(linkedid)})
+ same => n,Set(CHANNEL(hangup_handler_push)=call-end,s,1)
+ same => n,Goto(context-local-routing,${EXTEN},1)
+```
+
+This configuration accepts a channel such as
+`Local/1001@context-ami/n`; `context-local-routing` must define how logical
+destination `1001` is routed. It also assumes that the local Dialplan provides
+the `call-end,s,1` hangup handler.
 
 ## Verification
 

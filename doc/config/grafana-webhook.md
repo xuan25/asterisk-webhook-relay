@@ -28,14 +28,14 @@ Side bar → Alerting → Notification configuration → Templates
 ```
 
 Create a template group and add this complete named template. Replace
-`PJSIP/1001` and `PBX Alert <999>` before saving.
+`PBX Alert <999>` before saving.
 
 ```gotemplate
 {{ define "pbx.ami.originate" -}}
 {{- $alert := index .Alerts 0 -}}
 Action: Originate
 ActionID: grafana-{{ $alert.Fingerprint }}-{{ $alert.StartsAt.Unix }}
-Channel: PJSIP/1001
+Channel: PJSIP/{{ $alert.Annotations.pbx_endpoint }}
 Context: alert-notify
 Exten: s
 Priority: 1
@@ -86,9 +86,38 @@ Async: true
 ```
 
 The template renders exactly one AMI frame for the first alert in the
-notification. The policy in Step 4 disables grouping, making that one alert
-the complete notification. `ActionID` combines fingerprint and firing start
-time: repeated reminders within one firing cycle retain the same ActionID.
+notification. In simple mode, `pbx_endpoint` is the PJSIP endpoint name
+without the `PJSIP/` prefix. The policy in Step 4 disables grouping, making
+that one alert the complete notification. `ActionID` combines fingerprint and
+firing start time: repeated reminders within one firing cycle retain the same
+ActionID.
+
+### Advanced mode: route a logical destination through Asterisk
+
+The template above is the simple mode: it directly creates a PJSIP channel for
+the endpoint named by `pbx_endpoint`. Use the advanced mode when Grafana should
+name a logical destination and let the PBX decide whether that number is local,
+ENUM-routed, or sent to another outbound peer.
+
+Replace only the `Channel:` line in the notification template with:
+
+```gotemplate
+Channel: Local/{{ $alert.Annotations.pbx_destination }}@<AMI_INGRESS_CONTEXT>/n
+```
+
+Replace `<AMI_INGRESS_CONTEXT>` with the dedicated AMI ingress context from
+the advanced Dialplan configuration. For every rule sent through this template,
+add a non-empty `pbx_destination` annotation containing the logical number to
+call. The PBX Dialplan, not Grafana, validates and routes that number.
+
+In an AMI `Originate`, `Channel` identifies who to call; the existing
+`Context`, `Exten`, and `Priority` fields identify what runs after answer. The
+`/n` suffix retains the Local channel after answer, preserving ingress
+variables, logging, and channel lifecycle visibility.
+
+Use a separate template and Contact Point when simple direct-endpoint rules and
+advanced logical-destination rules must coexist. The Notification Policy can
+route them with distinct labels.
 
 ### Step 3: Create the Webhook Contact Point
 
@@ -159,6 +188,8 @@ Add these annotations to the same rule:
 | `pbx_title_type` | `playback` | yes |
 | `pbx_title_value` | a recorded prompt name, for example `alert/event/bgp-session-down` | yes |
 | `pbx_severity` | `critical` or `warning` | yes |
+| `pbx_endpoint` | PJSIP endpoint name without `PJSIP/` | required in simple mode |
+| `pbx_destination` | logical number accepted by the AMI ingress Dialplan | required in advanced mode |
 | `pbx_field<n>_label` | a recorded prompt name; `n` is 1, 2, or 3 | only when that field is used |
 | `pbx_field<n>_type` | `digits`, `number`, `alpha`, or `playback` | only when that field is used |
 | `pbx_field<n>_value` | an Alert Rule template or literal value | only when that field is used |
@@ -175,25 +206,27 @@ the Alert Rule; it can use values such as `{{ $labels.peer_as }}` or
 ### BGP session-down rule
 
 ```text
-phone_alert       = true
-pbx_title_type    = playback
-pbx_title_value   = alert/event/bgp-session-down
-pbx_field1_label  = alert/field/peer-as
-pbx_field1_type   = digits
-pbx_field1_value  = {{ $labels.peer_as }}
-pbx_severity      = critical
+phone_alert      = true
+pbx_endpoint     = 0001
+pbx_title_type   = playback
+pbx_title_value  = alert/event/bgp-session-down
+pbx_field1_label = alert/field/peer-as
+pbx_field1_type  = digits
+pbx_field1_value = {{ $labels.peer_as }}
+pbx_severity     = critical
 ```
 
 ### Disk-space-low rule
 
 ```text
-phone_alert       = true
-pbx_title_type    = playback
-pbx_title_value   = alert/event/disk-space-low
-pbx_field1_label  = alert/field/usage-percent
-pbx_field1_type   = number
-pbx_field1_value  = {{ $values.A.Value | printf "%.0f" }}
-pbx_severity      = warning
+phone_alert      = true
+pbx_endpoint     = 0001
+pbx_title_type   = playback
+pbx_title_value  = alert/event/disk-space-low
+pbx_field1_label = alert/field/usage-percent
+pbx_field1_type  = number
+pbx_field1_value = {{ $values.A.Value | printf "%.0f" }}
+pbx_severity     = warning
 ```
 
 ## Verification
@@ -208,14 +241,7 @@ frame delivery, not that the phone answered.
 
 ## Troubleshooting
 
-| Symptom | Cause / check |
-| --- | --- |
-| `401` | Grafana and relay HMAC secrets differ, the signature header differs, or the body changed in transit. |
-| `400` | Custom Payload is empty or does not render one non-empty `ActionID`. |
-| `409` | An in-flight relay transaction already uses the same ActionID. Check notification timings. |
-| `415` | Confirm the saved extra header is `Content-Type: text/plain`. |
-| `503` | Relay has no authenticated AMI session, the AMI write failed, or the queue is full. |
-| Phone rings without audio | Verify prompt names, `CHANNEL(language)`, audio formats/codecs, and RTP reachability. |
+Use the shared [relay webhook troubleshooting table](relay-webhook-test.md#troubleshooting).
 
 ## References
 

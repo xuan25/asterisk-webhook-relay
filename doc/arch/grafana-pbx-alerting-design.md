@@ -96,7 +96,7 @@ routing fields are the recipient `Channel`, `Context: alert-notify`,
 ```text
 Action: Originate
 ActionID: grafana-<fingerprint>-<firing-start-time>
-Channel: PJSIP/<recipient-endpoint>
+Channel: PJSIP/<endpoint-from-pbx_endpoint-annotation>
 Context: alert-notify
 Exten: s
 Priority: 1
@@ -122,6 +122,35 @@ Variable: __ALERT_FIELDn_SUFFIX=<optional-recording>
 `ActionID` combines the Grafana alert fingerprint and firing start time. It
 remains constant for reminders in the same firing cycle and changes when that
 alert fires in a later cycle.
+
+### 4.4 Advanced logical-destination routing
+
+The simple mode uses `Channel: PJSIP/<endpoint>` and therefore couples the
+Grafana template to one endpoint implementation. The advanced mode uses:
+
+```text
+Channel: Local/<logical-destination>@<ami-ingress-context>/n
+```
+
+This moves destination resolution into Asterisk. The AMI ingress context marks
+the call source, runs site-specific accounting if required, and transfers the
+logical destination to the PBX's canonical routing context. That context can
+then choose a local endpoint, ENUM resolution, or any outbound trunk without a
+Grafana template change.
+
+```text
+Grafana logical destination
+    → Local channel
+    → AMI ingress context
+    → canonical PBX number routing
+    → selected endpoint or outbound peer
+```
+
+`/n` keeps the Local channel after answer, preserving ingress variables and
+call lifecycle visibility. The call's `CallerID`, the outbound PJSIP
+`from_domain`, and transport signalling/media addresses remain separate
+concerns: respectively channel identity, endpoint SIP identity, and transport
+reachability.
 
 ## 5. Asterisk rendering contract
 

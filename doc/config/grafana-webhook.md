@@ -36,7 +36,7 @@ Create a template group and add this complete named template. Replace
 Action: Originate
 ActionID: grafana-{{ $alert.Fingerprint }}-{{ $alert.StartsAt.Unix }}
 Channel: PJSIP/{{ $alert.Annotations.pbx_endpoint }}
-Context: alert-notify
+Context: service-alert-notify
 Exten: s
 Priority: 1
 Timeout: 30000
@@ -102,10 +102,10 @@ ENUM-routed, or sent to another outbound peer.
 Replace only the `Channel:` line in the notification template with:
 
 ```gotemplate
-Channel: Local/{{ $alert.Annotations.pbx_destination }}@<AMI_INGRESS_CONTEXT>/n
+Channel: Local/{{ $alert.Annotations.pbx_destination }}@<AMI_INGRESS>/n
 ```
 
-Replace `<AMI_INGRESS_CONTEXT>` with the dedicated AMI ingress context from
+Replace `<AMI_INGRESS>` with the dedicated AMI ingress context from
 the advanced Dialplan configuration. For every rule sent through this template,
 add a non-empty `pbx_destination` annotation containing the logical number to
 call. The PBX Dialplan, not Grafana, validates and routes that number.
@@ -236,7 +236,7 @@ Use the Contact Point **Test** function with a test alert containing the Step
 `Action: Originate`, contain `Async: true`, and be sent as `text/plain`.
 
 The relay should return `202 Accepted`. Asterisk should then show an
-`OriginateResponse` and execute the `alert-notify` context. `202` confirms AMI
+`OriginateResponse` and execute the `service-alert-notify` context. `202` confirms AMI
 frame delivery, not that the phone answered.
 
 ## Troubleshooting

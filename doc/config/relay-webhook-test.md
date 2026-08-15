@@ -6,7 +6,7 @@ This runbook tests the complete relay path before Grafana is configured:
 curl
     → asterisk-webhook-relay
     → Asterisk AMI
-    → alert-notify Dialplan
+    → service-alert-notify Dialplan
     → recipient endpoint
 ```
 
@@ -45,7 +45,7 @@ Set `AMI_CHANNEL` first, then set every value used by the AMI action. Replace
 
 ```sh
 export AMI_CHANNEL='PJSIP/<recipient-endpoint>'
-export AMI_CONTEXT='alert-notify'
+export AMI_CONTEXT='service-alert-notify'
 export AMI_EXTENSION='s'
 export AMI_PRIORITY='1'
 export AMI_TIMEOUT='30000'
@@ -60,7 +60,7 @@ For advanced logical-destination routing, set `AMI_CHANNEL` to the following
 value instead, using the ingress context configured in the Dialplan:
 
 ```sh
-export AMI_CHANNEL='Local/<logical-destination>@<AMI_INGRESS_CONTEXT>/n'
+export AMI_CHANNEL='Local/<logical-destination>@<AMI_INGRESS>/n'
 ```
 
 ### Step 3: Create, sign, and send the AMI action
@@ -107,14 +107,14 @@ export ALERT_TITLE_VALUE='alert/event/bgp-session-down'
 ```
 
 For logical destination `1001` and an AMI ingress context named
-`context-ami`, set the channel as follows instead:
+`in-call-ami`, set the channel as follows instead:
 
 ```sh
-export AMI_CHANNEL='Local/1001@context-ami/n'
+export AMI_CHANNEL='Local/1001@in-call-ami/n'
 ```
 
 Use the actual ingress context configured in the advanced Dialplan rather than
-`context-ami` when it has a different name.
+`in-call-ami` when it has a different name.
 
 ### Completed direct-endpoint body
 
@@ -124,7 +124,7 @@ With `AMI_CHANNEL='PJSIP/0001'`, the body generated in Step 3 has this shape:
 Action: Originate
 ActionID: relay-curl-<unix-time>
 Channel: PJSIP/0001
-Context: alert-notify
+Context: service-alert-notify
 Exten: s
 Priority: 1
 Timeout: 30000
@@ -147,7 +147,7 @@ HTTP/1.0 202 Accepted
 
 `202` means the complete frame was written to the authenticated AMI session.
 Check Asterisk CLI output for the `Originate` action and execution of
-`alert-notify`; then answer the endpoint and confirm the recorded alert plays.
+`service-alert-notify`; then answer the endpoint and confirm the recorded alert plays.
 
 ## Troubleshooting
 
@@ -158,5 +158,5 @@ Check Asterisk CLI output for the `Originate` action and execution of
 | `409` | Generate another ActionID; an identical one is still pending. For Grafana, check notification timings. |
 | `415` | Confirm the Contact Point has the saved extra header `Content-Type: text/plain`. |
 | `503` | Wait for `AMI session is ready`, then check AMI host, credentials, ACL, relay logs, and queue capacity. |
-| `202`, but no phone call | Check Asterisk `OriginateResponse`, endpoint contact state, and the `alert-notify` Dialplan. |
+| `202`, but no phone call | Check Asterisk `OriginateResponse`, endpoint contact state, and the `service-alert-notify` Dialplan. |
 | Phone rings without audio | Verify prompt names, `CHANNEL(language)`, audio formats/codecs, and RTP reachability. |

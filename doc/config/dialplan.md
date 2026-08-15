@@ -19,7 +19,7 @@ Add this complete configuration to `extensions.conf`, or a dedicated file
 included by it. Replace `<LANGUAGE_ID>` before reloading.
 
 ```ini
-[alert-notify]
+[service-alert-notify]
 exten => s,1,NoOp(PBX alert: ${ALERT_ID})
  same => n,Answer()
  same => n,Set(CHANNEL(language)=<LANGUAGE_ID>)
@@ -98,7 +98,7 @@ has a current contact:
 
 ```sh
 asterisk -rx 'dialplan reload'
-asterisk -rx 'dialplan show alert-notify'
+asterisk -rx 'dialplan show service-alert-notify'
 asterisk -rx 'dialplan show alert-render'
 asterisk -rx 'pjsip show endpoint <recipient-endpoint>'
 asterisk -rx 'pjsip show contacts'
@@ -114,21 +114,21 @@ resolved through ENUM, or a future outbound trunk.
 ### 1. Add a dedicated AMI ingress context
 
 Create one ingress context for AMI-originated callouts. Replace
-`<AMI_INGRESS_CONTEXT>` and `<CANONICAL_ROUTING_CONTEXT>` with local context
+`<AMI_INGRESS>` and `<CANONICAL_ROUTING>` with local context
 names. The canonical routing context owns the numbering plan and selects the
 actual PJSIP endpoint or outbound peer.
 
 ```ini
-[<AMI_INGRESS_CONTEXT>]
+[<AMI_INGRESS>]
 exten => _!,1,Set(CALL_SOURCE=ami)
  same => n,Set(CALL_DESTINATION=${EXTEN})
- same => n,Goto(<CANONICAL_ROUTING_CONTEXT>,${EXTEN},1)
+ same => n,Goto(<CANONICAL_ROUTING>,${EXTEN},1)
 ```
 
 Add site-specific call logging or a hangup handler in this ingress context if
 needed. `CALL_SOURCE` and `CALL_DESTINATION` are example channel-variable
 names; map them to the local accounting convention if one exists. The final
-`Goto()` passes the logical destination to `<CANONICAL_ROUTING_CONTEXT>`.
+`Goto()` passes the logical destination to `<CANONICAL_ROUTING>`.
 Restrict the extension pattern instead of `_!` when that context does not
 safely reject unsupported destinations.
 
@@ -136,21 +136,21 @@ safely reject unsupported destinations.
 
 ### Completed language and endpoint substitutions
 
-For a deployment using language `xuan25` and PJSIP endpoint `0001`, the
+For a deployment using language `en` and PJSIP endpoint `0001`, the
 placeholders in Steps 2 through 4 become:
 
 ```ini
-same => n,Set(CHANNEL(language)=xuan25)
+same => n,Set(CHANNEL(language)=en)
 ```
 
 ```text
-/var/lib/asterisk/sounds/xuan25/alert/header.wav
-/var/lib/asterisk/sounds/xuan25/alert/severity/critical.wav
-/var/lib/asterisk/sounds/xuan25/alert/severity/warning.wav
-/var/lib/asterisk/sounds/xuan25/alert/event/bgp-session-down.wav
-/var/lib/asterisk/sounds/xuan25/alert/event/disk-space-low.wav
-/var/lib/asterisk/sounds/xuan25/alert/field/peer-as.wav
-/var/lib/asterisk/sounds/xuan25/alert/field/usage-percent.wav
+/var/lib/asterisk/sounds/en/alert/header.wav
+/var/lib/asterisk/sounds/en/alert/severity/critical.wav
+/var/lib/asterisk/sounds/en/alert/severity/warning.wav
+/var/lib/asterisk/sounds/en/alert/event/bgp-session-down.wav
+/var/lib/asterisk/sounds/en/alert/event/disk-space-low.wav
+/var/lib/asterisk/sounds/en/alert/field/peer-as.wav
+/var/lib/asterisk/sounds/en/alert/field/usage-percent.wav
 ```
 
 ```sh
@@ -159,22 +159,22 @@ asterisk -rx 'pjsip show endpoint 0001'
 
 ### Completed AMI ingress context
 
-For an ingress context named `context-ami` and a canonical routing context
-named `context-local-routing`, the advanced configuration becomes:
+For an ingress context named `in-call-ami` and a canonical routing context
+named `route-call`, the advanced configuration becomes:
 
 ```ini
-[context-ami]
+[in-call-ami]
 exten => _!,1,Set(PBX_SOURCE=ami)
  same => n,Set(PBX_FROM=${CALLERID(num)})
  same => n,Set(PBX_TO=${EXTEN})
  same => n,Set(PBX_RESULT=UNKNOWN)
  same => n,Log(pbxevent,CALL_IN source=${PBX_SOURCE} from=${PBX_FROM} to=${PBX_TO} uniqueid=${UNIQUEID} linkedid=${CHANNEL(linkedid)})
  same => n,Set(CHANNEL(hangup_handler_push)=call-end,s,1)
- same => n,Goto(context-local-routing,${EXTEN},1)
+ same => n,Goto(route-call,${EXTEN},1)
 ```
 
 This configuration accepts a channel such as
-`Local/1001@context-ami/n`; `context-local-routing` must define how logical
+`Local/1001@in-call-ami/n`; `route-call` must define how logical
 destination `1001` is routed. It also assumes that the local Dialplan provides
 the `call-end,s,1` hangup handler.
 
@@ -183,7 +183,7 @@ the `call-end,s,1` hangup handler.
 Test the Dialplan and endpoint directly before testing Grafana or AMI:
 
 ```sh
-asterisk -rx 'channel originate PJSIP/<recipient-endpoint> extension s@alert-notify'
+asterisk -rx 'channel originate PJSIP/<recipient-endpoint> extension s@service-alert-notify'
 ```
 
 For an end-to-end alert test, inspect Asterisk CLI output while the alert
@@ -195,7 +195,7 @@ core set verbose 5
 core set debug 3
 ```
 
-Expected output includes `alert-notify`, `Playback`, a `Say*` application when
+Expected output includes `service-alert-notify`, `Playback`, a `Say*` application when
 a dynamic field is present, and `Hangup`.
 
 ## References
